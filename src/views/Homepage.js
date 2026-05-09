@@ -15,49 +15,6 @@ function Homepage({ user, onLogout }) {
 	const [message, setMessage] = useState("");
 	const [chatMessages, setChatMessages] = useState([]);
 	const [messageSent, setMessageSent] = useState(false);
-	const [bookings, setBookings] = useState([]);
-	const [showBookings, setShowBookings] = useState(false);
-
-	React.useEffect(() => {
-		if (showBookings && user) {
-			fetchBookings();
-		}
-	}, [showBookings, user]);
-
-	const fetchBookings = async () => {
-		try {
-			const token = localStorage.getItem("token");
-			const response = await fetch("http://localhost:5000/api/bookings", {
-				headers: {
-					Authorization: `Bearer ${token}`
-				}
-			});
-			if (response.ok) {
-				const data = await response.json();
-				setBookings(data);
-			}
-		} catch (error) {
-			console.error("Error fetching bookings:", error);
-		}
-	};
-
-	const handleCancelBooking = async (bookingId) => {
-		if (!window.confirm("Are you sure you want to cancel this booking?")) return;
-		try {
-			const token = localStorage.getItem("token");
-			const response = await fetch(`http://localhost:5000/api/bookings/${bookingId}`, {
-				method: "DELETE",
-				headers: {
-					Authorization: `Bearer ${token}`
-				}
-			});
-			if (response.ok) {
-				fetchBookings();
-			}
-		} catch (error) {
-			console.error("Error canceling booking:", error);
-		}
-	};
 
 	const handleContactVendor = (vendor) => {
 		setSelectedVendor(vendor);
@@ -118,7 +75,7 @@ function Homepage({ user, onLogout }) {
 		<div className="App bg-white overflow-hidden">
 			<div className="bg-[#40a8ed] w-full min-h-[70px] flex justify-between items-center px-4 relative">
 				<Link to="/">
-					<img alt="logo" src="/assets/event_logo.png" className="w-[200px] h-[70px] rounded-lg border-spacing-1  "></img>
+					<img alt="logo" src="/assets/event_logo.png" className="h-[72px] w-auto max-w-[240px] object-contain rounded-lg border-spacing-1"></img>
 				</Link>
 				<div className="relative">
 					<button
@@ -138,7 +95,7 @@ function Homepage({ user, onLogout }) {
 								</div>
 								<button
 									onClick={() => {
-										setShowBookings(true);
+										navigate("/bookings");
 										setShowProfileMenu(false);
 									}}
 									className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -393,47 +350,6 @@ function Homepage({ user, onLogout }) {
 				</div>
 			)}
 
-			{/* Bookings Modal */}
-			{showBookings && (
-				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-					<div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
-						<div className="flex justify-between items-center mb-6">
-							<h2 className="text-2xl font-bold text-gray-800">My Bookings</h2>
-							<button
-								onClick={() => setShowBookings(false)}
-								className="text-gray-500 hover:text-gray-700 text-2xl"
-							>
-								✕
-							</button>
-						</div>
-
-						{bookings.length > 0 ? (
-							<div className="space-y-4">
-								{bookings.map((booking) => (
-									<div key={booking.id} className="bg-gray-50 rounded-lg p-4 border flex justify-between items-center">
-										<div>
-											<h4 className="font-medium text-gray-800">{booking.vendorName}</h4>
-											<p className="text-sm text-gray-600">Category: {booking.vendorCategory}</p>
-											<p className="text-sm text-gray-600">Price: {booking.price}</p>
-											<p className="text-sm text-gray-500">Date: {new Date(booking.createdAt).toLocaleDateString()}</p>
-										</div>
-										<button
-											onClick={() => handleCancelBooking(booking.id)}
-											className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-md text-sm transition-colors"
-										>
-											Cancel Booking
-										</button>
-									</div>
-								))}
-							</div>
-						) : (
-							<div className="text-center py-8">
-								<p className="text-gray-500">You don't have any bookings yet.</p>
-							</div>
-						)}
-					</div>
-				</div>
-			)}
 
 			{/* Cart Sidebar */}
 			{showCart && (

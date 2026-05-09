@@ -47,8 +47,8 @@ function Login({ onLogin }) {
 	return (
 		<div className="min-h-screen bg-zinc-900 flex text-white items-center justify-center px-4">
 			<div className="bg-zinc-800 p-8 rounded-lg shadow-lg w-full max-w-md">
-				<div class="w-full h-52 rounded-lg bg-zinc-700 overflow-hidden">
-                    <img class="w-full h-full object-cover" src={eventLogo} alt="Event Logo" ></img>
+				<div className="w-full h-52 rounded-lg bg-zinc-700 overflow-hidden">
+                    <img className="w-full h-full object-cover" src={eventLogo} alt="Event Logo" ></img>
                 </div>
 				{error && (
 					<div className="mb-4 p-3 bg-red-600 text-white rounded-md">

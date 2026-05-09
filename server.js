@@ -26,6 +26,7 @@ const userSchema = new mongoose.Schema(
 const bookingSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    vendorId: { type: String },
     vendorName: { type: String, required: true },
     vendorCategory: { type: String, required: true },
     price: { type: String, required: true },
@@ -34,8 +35,20 @@ const bookingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const reviewSchema = new mongoose.Schema(
+  {
+    vendorId: { type: String, required: true, index: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    name: { type: String, required: true },
+    rating: { type: Number, required: true, min: 1, max: 5 },
+    comment: { type: String, required: true }
+  },
+  { timestamps: true }
+);
+
 const User = mongoose.model('User', userSchema);
 const Booking = mongoose.model('Booking', bookingSchema);
+const Review = mongoose.model('Review', reviewSchema);
 
 let vendors = [
   // Catering
@@ -53,6 +66,30 @@ let vendors = [
   { _id: '8', name: "Garden Paradise", description: "Beautiful outdoor venues with natural settings", contact: "+91-9876543217", rating: 4.6, priceRange: "₹100,000 - ₹1,000,000", category: "venue", eventTypes: ["wedding", "birthday", "meeting", "houseparty", "custom"], image: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=500&q=80", services: ["Lawn venue access", "Outdoor stage", "Rain backup arrangements", "Decor tie-ups"], reviews: [{ name: "Harshita C.", rating: 5, comment: "Perfect outdoor vibe for evening functions." }, { name: "Nakul A.", rating: 4, comment: "Nice ambience and responsive management." }] },
   { _id: '9', name: "Urban Chic Halls", description: "Modern urban venues for contemporary events", contact: "+91-9876543218", rating: 4.7, priceRange: "₹150,000 - ₹1,500,000", category: "venue", eventTypes: ["wedding", "birthday", "meeting", "houseparty", "custom"], image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80", services: ["Contemporary banquet design", "Conference-ready setup", "Premium lighting", "Dedicated event coordinator"], reviews: [{ name: "Shreya M.", rating: 5, comment: "Modern interiors and excellent service quality." }, { name: "Raghav E.", rating: 4, comment: "Great central location and clean facilities." }] },
 ];
+
+const findVendorForBooking = (booking) =>
+  vendors.find(vendor => vendor._id === booking.vendorId) ||
+  vendors.find(vendor => vendor.name === booking.vendorName);
+
+const getVendorWithReviews = async (vendor) => {
+  const storedReviews = await Review.find({ vendorId: vendor._id }).sort({ createdAt: -1 });
+  const reviews = [
+    ...storedReviews.map((review) => ({
+      name: review.name,
+      rating: review.rating,
+      comment: review.comment,
+      createdAt: review.createdAt
+    })),
+    ...(vendor.reviews || [])
+  ];
+
+  const totalRating = reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0);
+  const rating = reviews.length > 0
+    ? Number((totalRating / reviews.length).toFixed(1))
+    : vendor.rating;
+
+  return { ...vendor, reviews, rating };
+};
 
 // Auth middleware
 const auth = (req, res, next) => {
@@ -138,12 +175,13 @@ app.post('/api/bookings', auth, async (req, res) => {
     for (const item of items) {
       const booking = await Booking.create({
         userId,
+        vendorId: item._id,
         vendorName: item.name,
         vendorCategory: item.category,
         price: item.priceRange,
         status: 'Active'
       });
-      bookings.push({ id: booking._id.toString(), userId, vendorName: item.name, totalAmount, paymentMethod });
+      bookings.push({ id: booking._id.toString(), userId, vendorId: item._id, vendorName: item.name, totalAmount, paymentMethod });
     }
     
     res.json({ success: true, bookings });
@@ -156,19 +194,69 @@ app.get('/api/bookings', auth, async (req, res) => {
   try {
     const userId = req.user.id;
     const bookings = await Booking.find({ userId }).sort({ createdAt: -1 });
-    res.json(
-      bookings.map((booking) => ({
-        id: booking._id.toString(),
-        userId: booking.userId.toString(),
-        vendorName: booking.vendorName,
-        vendorCategory: booking.vendorCategory,
-        price: booking.price,
-        status: booking.status,
-        createdAt: booking.createdAt
-      }))
+    const bookingsWithVendors = await Promise.all(
+      bookings.map(async (booking) => {
+        const vendor = findVendorForBooking(booking);
+        const vendorWithReviews = vendor ? await getVendorWithReviews(vendor) : null;
+
+        return {
+          id: booking._id.toString(),
+          userId: booking.userId.toString(),
+          vendorId: booking.vendorId || vendor?._id,
+          vendorName: booking.vendorName,
+          vendorCategory: booking.vendorCategory,
+          price: booking.price,
+          status: booking.status,
+          createdAt: booking.createdAt,
+          vendor: vendorWithReviews
+        };
+      })
     );
+
+    res.json(bookingsWithVendors);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/bookings/:id/reviews', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { rating, comment } = req.body;
+    const numericRating = Number(rating);
+    const trimmedComment = String(comment || '').trim();
+
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+      return res.status(400).json({ message: 'Rating must be a whole number between 1 and 5' });
+    }
+
+    if (!trimmedComment) {
+      return res.status(400).json({ message: 'Comment is required' });
+    }
+
+    const booking = await Booking.findOne({ _id: req.params.id, userId });
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+    const vendor = findVendorForBooking(booking);
+    if (!vendor) return res.status(404).json({ message: 'Vendor not found for this booking' });
+
+    const user = await User.findById(req.user.id).select('name');
+    await Review.create({
+      vendorId: vendor._id,
+      userId,
+      name: user?.name || req.user.email || 'Customer',
+      rating: numericRating,
+      comment: trimmedComment
+    });
+
+    const vendorWithReviews = await getVendorWithReviews(vendor);
+    res.json({ success: true, vendor: vendorWithReviews });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to submit review' });
   }
 });
 
@@ -190,21 +278,55 @@ app.delete('/api/bookings/:id', auth, async (req, res) => {
 });
 
 // Vendor routes
-app.get('/api/vendors', (req, res) => {
-  res.json(vendors);
+app.get('/api/vendors', async (req, res) => {
+  res.json(await Promise.all(vendors.map(getVendorWithReviews)));
 });
 
-app.get('/api/vendors/:category', (req, res) => {
+app.get('/api/vendors/:category', async (req, res) => {
   const categoryVendors = vendors.filter(vendor => vendor.category === req.params.category);
-  res.json(categoryVendors);
+  res.json(await Promise.all(categoryVendors.map(getVendorWithReviews)));
 });
 
-app.post('/api/vendors/recommend', (req, res) => {
+app.post('/api/vendors/recommend', async (req, res) => {
    const { eventType } = req.body;
    const recommendedVendors = vendors.filter(vendor =>
      vendor.eventTypes.includes(eventType)
    );
-   res.json(recommendedVendors);
+   res.json(await Promise.all(recommendedVendors.map(getVendorWithReviews)));
+});
+
+app.post('/api/vendors/:id/reviews', auth, async (req, res) => {
+   try {
+     const { rating, comment } = req.body;
+     const numericRating = Number(rating);
+     const trimmedComment = String(comment || '').trim();
+
+     if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+       return res.status(400).json({ message: 'Rating must be a whole number between 1 and 5' });
+     }
+
+     if (!trimmedComment) {
+       return res.status(400).json({ message: 'Comment is required' });
+     }
+
+     const vendor = vendors.find(v => v._id === req.params.id);
+     if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+     const user = await User.findById(req.user.id).select('name');
+     await Review.create({
+       vendorId: vendor._id,
+       userId: req.user.id,
+       name: user?.name || req.user.email || 'Customer',
+       rating: numericRating,
+       comment: trimmedComment
+     });
+
+     const vendorWithReviews = await getVendorWithReviews(vendor);
+
+     res.json({ success: true, vendor: vendorWithReviews });
+   } catch (err) {
+     res.status(500).json({ message: 'Failed to submit review' });
+   }
 });
 
 // Messages storage (in-memory for demo)

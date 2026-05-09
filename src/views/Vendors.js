@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import EventifyHeader from "../components/EventifyHeader";
 import BudgetTracker from "./vendors/BudgetTracker";
 import CartIcon from "./vendors/CartIcon";
@@ -11,9 +11,7 @@ import { calculateCartTotal } from "./vendors/vendorUtils";
 
 function Vendors() {
 	const location = useLocation();
-	const navigate = useNavigate();
 	const estimate = location.state?.estimate || 0;
-	const eventRoute = location.state?.eventRoute || "/";
 	const [selectedVendor, setSelectedVendor] = useState(null);
 	const [showChat, setShowChat] = useState(false);
 	const [cartItems, setCartItems] = useState([]);
@@ -51,6 +49,16 @@ function Vendors() {
 		setShowChat(true);
 	};
 
+	const handleAddToCart = (vendor) => {
+		setCartItems((items) => {
+			const alreadyAdded = items.some((item) => item._id === vendor._id);
+			if (alreadyAdded) return items;
+
+			return [...items, vendor];
+		});
+		setShowCart(true);
+	};
+
 	const handleRemoveFromCart = (index) => {
 		setCartItems(cartItems.filter((_, i) => i !== index));
 	};
@@ -82,21 +90,21 @@ function Vendors() {
 					titleClassName="text-green-700"
 					vendors={cateringVendors}
 					onContact={handleContactVendor}
-					onSelectEvent={() => navigate(eventRoute)}
+					onAddToCart={handleAddToCart}
 				/>
 				<VendorSection
 					title="Decoration Vendors"
 					titleClassName="text-purple-700"
 					vendors={decorationVendors}
 					onContact={handleContactVendor}
-					onSelectEvent={() => navigate(eventRoute)}
+					onAddToCart={handleAddToCart}
 				/>
 				<VendorSection
 					title="Venue Vendors"
 					titleClassName="text-indigo-700"
 					vendors={venueVendors}
 					onContact={handleContactVendor}
-					onSelectEvent={() => navigate(eventRoute)}
+					onAddToCart={handleAddToCart}
 				/>
 			</div>
 
@@ -129,7 +137,7 @@ function Vendors() {
 	);
 }
 
-function VendorSection({ title, titleClassName, vendors, onContact, onSelectEvent }) {
+function VendorSection({ title, titleClassName, vendors, onContact, onAddToCart }) {
 	return (
 		<div className="mb-12">
 			<h2 className={`text-3xl font-semibold mb-8 text-center ${titleClassName}`}>
@@ -141,7 +149,7 @@ function VendorSection({ title, titleClassName, vendors, onContact, onSelectEven
 						key={`${vendor.name}-${index}`}
 						vendor={vendor}
 						onContact={onContact}
-						onSelectEvent={onSelectEvent}
+						onAddToCart={onAddToCart}
 					/>
 				))}
 			</div>

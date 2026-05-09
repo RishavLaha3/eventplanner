@@ -1,6 +1,6 @@
 import { getVendorReviews, getVendorServices } from "./vendorUtils";
 
-function VendorCard({ vendor, onContact, onSelectEvent }) {
+function VendorCard({ vendor, onContact, onAddToCart }) {
 	return (
 		<div className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
 			{vendor.image && <img src={vendor.image} alt={vendor.name} className="w-full h-48 object-cover rounded-xl mb-4" />}
@@ -44,10 +44,10 @@ function VendorCard({ vendor, onContact, onSelectEvent }) {
 					Contact Vendor
 				</button>
 				<button
-					onClick={onSelectEvent}
+					onClick={() => onAddToCart(vendor)}
 					className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium transition-colors duration-300"
 				>
-					Select Event
+					Add to Cart
 				</button>
 			</div>
 		</div>

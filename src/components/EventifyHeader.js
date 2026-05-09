@@ -8,7 +8,7 @@ function EventifyHeader() {
 				<img
 					alt="Eventify logo"
 					src="/assets/event_logo.png"
-					className="w-[200px] h-[70px] rounded-lg border-spacing-1"
+					className="h-[72px] w-auto max-w-[240px] object-contain rounded-lg border-spacing-1"
 				/>
 			</Link>
 		</header>
